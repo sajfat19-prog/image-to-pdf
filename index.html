@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>صور إلى PDF | دمج PDF</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f4f6f8;color:#17202a;font-family:system-ui,-apple-system,"Segoe UI",Tahoma,Arial}
+.wrap{max-width:900px;margin:auto;padding:18px}.head{text-align:center;margin:8px 0 18px}.head h1{margin:0 0 5px;font-size:27px}.muted{color:#667085}
+.tabs{display:flex;gap:8px;margin-bottom:14px}.tab{flex:1;border:0;border-radius:12px;padding:13px;font-size:16px;font-weight:700;background:#e4e8ed;cursor:pointer}.tab.active{background:#111827;color:white}
+.panel{display:none;background:#fff;border-radius:18px;padding:16px;box-shadow:0 5px 22px #0000000d}.panel.active{display:block}
+.drop{display:block;border:2px dashed #98a2b3;border-radius:15px;padding:30px 15px;text-align:center;background:#fafafa;cursor:pointer}.drop strong{display:block;font-size:18px;margin-bottom:6px}.drop input{display:none}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0}button,select{border:0;border-radius:11px;padding:11px 14px;font-size:14px}button{background:#111827;color:white;cursor:pointer}button.secondary{background:#e8ecf1;color:#17202a}button:disabled{opacity:.45;cursor:not-allowed}
+.opts{display:flex;gap:10px;flex-wrap:wrap}.opts label{background:#f1f3f5;border-radius:10px;padding:8px 10px;font-size:13px}.opts select{background:transparent;padding:2px}
+.list{display:grid;gap:8px;margin-top:14px}.item{display:flex;align-items:center;gap:9px;border:1px solid #e2e6eb;border-radius:12px;padding:8px}.thumb{width:58px;height:70px;object-fit:contain;background:#f2f4f6;border-radius:7px}.num{font-weight:800;width:22px}.name{flex:1;word-break:break-word}.mini{padding:7px 9px;font-size:12px}.status{text-align:center;margin-top:10px;color:#475467;font-size:14px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<div class="head"><h1>📄 محول ودمج PDF</h1><div class="muted">سريع وبسيط ويعمل مباشرة على جهازك</div></div>
+
+<div class="tabs">
+<button class="tab active" data-target="toPdf">🖼️ صور → PDF</button>
+<button class="tab" data-target="merge">📑 دمج PDF</button>
+</div>
+
+<section id="toPdf" class="panel active">
+<label class="drop" id="imageDrop"><strong>اختيار الصور</strong><span>اختر صورة واحدة أو عدة صور</span><input id="imageInput" type="file" accept="image/*" multiple></label>
+<div class="actions"><button id="makePdf" disabled>إنشاء PDF</button><button id="clearImages" class="secondary">مسح</button></div>
+<div class="opts">
+<label>الحجم <select id="size"><option value="a4">A4</option><option value="a5">A5</option><option value="letter">Letter</option></select></label>
+<label>الاتجاه <select id="orient"><option value="auto">تلقائي</option><option value="p">عمودي</option><option value="l">أفقي</option></select></label>
+</div>
+<div id="imageList" class="list"></div><div id="imageStatus" class="status"></div>
+</section>
+
+<section id="merge" class="panel">
+<label class="drop" id="pdfDrop"><strong>اختيار ملفات PDF</strong><span>اختر عدة ملفات PDF لدمجها</span><input id="pdfInput" type="file" accept=".pdf,application/pdf" multiple></label>
+<div class="actions"><button id="mergeBtn" disabled>دمج الملفات</button><button id="clearPdfs" class="secondary">مسح</button></div>
+<div id="pdfList" class="list"></div><div id="pdfStatus" class="status"></div>
+</section>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+<script>
+const $=id=>document.getElementById(id);let images=[],pdfs=[];
+document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));b.classList.add('active');$(b.dataset.target).classList.add('active')});
+
+function dropZone(drop,input,fn){$(drop).onclick=()=>$(input).click();$(drop).ondragover=e=>e.preventDefault();$(drop).ondrop=e=>{e.preventDefault();fn([...e.dataTransfer.files])};$(input).onchange=e=>fn([...e.target.files])}
+dropZone('imageDrop','imageInput',fs=>{fs.filter(f=>f.type.startsWith('image/')).forEach(f=>images.push({f,url:URL.createObjectURL(f)}));renderImages()});
+dropZone('pdfDrop','pdfInput',fs=>{fs.filter(f=>f.type==='application/pdf'||/\.pdf$/i.test(f.name)).forEach(f=>pdfs.push({f}));renderPdfs()});
+
+function esc(s){return s.replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]))}
+function move(a,i,d){let j=i+d;if(j<0||j>=a.length)return;[a[i],a[j]]=[a[j],a[i]]}
+function renderImages(){$('imageList').innerHTML=images.map((x,i)=>`<div class="item"><b class="num">${i+1}</b><img class="thumb" src="${x.url}"><span class="name">${esc(x.f.name)}</span><button class="mini secondary" onclick="move(images,${i},-1);renderImages()">↑</button><button class="mini secondary" onclick="move(images,${i},1);renderImages()">↓</button><button class="mini" onclick="images.splice(${i},1);renderImages()">حذف</button></div>`).join('');$('makePdf').disabled=!images.length}
+function renderPdfs(){$('pdfList').innerHTML=pdfs.map((x,i)=>`<div class="item"><b class="num">${i+1}</b><div class="thumb" style="display:grid;place-items:center;font-size:25px">PDF</div><span class="name">${esc(x.f.name)}</span><button class="mini secondary" onclick="move(pdfs,${i},-1);renderPdfs()">↑</button><button class="mini secondary" onclick="move(pdfs,${i},1);renderPdfs()">↓</button><button class="mini" onclick="pdfs.splice(${i},1);renderPdfs()">حذف</button></div>`).join('');$('mergeBtn').disabled=!pdfs.length}
+$('clearImages').onclick=()=>{images.forEach(x=>URL.revokeObjectURL(x.url));images=[];renderImages();$('imageStatus').textContent=''};
+$('clearPdfs').onclick=()=>{pdfs=[];renderPdfs();$('pdfStatus').textContent=''};
+
+function readData(f){return new Promise((res,rej)=>{let r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(f)})}
+function image(src){return new Promise((res,rej)=>{let i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=src})}
+
+$('makePdf').onclick=async()=>{
+ const {jsPDF}=window.jspdf;$('makePdf').disabled=true;
+ try{
+  let doc=null;
+  for(let n=0;n<images.length;n++){
+   $('imageStatus').textContent=`جاري تجهيز الصورة ${n+1} من ${images.length}…`;
+   let data=await readData(images[n].f),im=await image(data);
+   let o=$('orient').value;if(o==='auto')o=im.naturalWidth>=im.naturalHeight?'l':'p';
+   if(!doc)doc=new jsPDF({orientation:o,unit:'mm',format:$('size').value,compress:true});
+   else doc.addPage($('size').value,o);
+   let pw=doc.internal.pageSize.getWidth(),ph=doc.internal.pageSize.getHeight(),m=5;
+   let r=Math.min((pw-2*m)/im.naturalWidth,(ph-2*m)/im.naturalHeight);
+   let w=im.naturalWidth*r,h=im.naturalHeight*r;
+   let type=/\.png$/i.test(images[n].f.name)?'PNG':'JPEG';
+   doc.addImage(data,type,(pw-w)/2,(ph-h)/2,w,h,undefined,'FAST');
+   await new Promise(r=>setTimeout(r,0));
+  }
+  doc.save('صور-إلى-PDF.pdf');$('imageStatus').textContent='تم إنشاء ملف PDF بنجاح ✓';
+ }catch(e){console.error(e);$('imageStatus').textContent='حدث خطأ أثناء إنشاء PDF.'}
+ $('makePdf').disabled=!images.length;
+};
+
+$('mergeBtn').onclick=async()=>{
+ const {PDFDocument}=PDFLib;$('mergeBtn').disabled=true;
+ try{
+  let out=await PDFDocument.create();
+  for(let n=0;n<pdfs.length;n++){
+   $('pdfStatus').textContent=`جاري دمج الملف ${n+1} من ${pdfs.length}…`;
+   let src=await PDFDocument.load(await pdfs[n].f.arrayBuffer());
+   (await out.copyPages(src,src.getPageIndices())).forEach(p=>out.addPage(p));
+   await new Promise(r=>setTimeout(r,0));
+  }
+  let blob=new Blob([await out.save()],{type:'application/pdf'}),url=URL.createObjectURL(blob),a=document.createElement('a');
+  a.href=url;a.download='ملفات-PDF-مدمجة.pdf';a.click();setTimeout(()=>URL.revokeObjectURL(url),2000);
+  $('pdfStatus').textContent='تم دمج الملفات بنجاح ✓';
+ }catch(e){console.error(e);$('pdfStatus').textContent='حدث خطأ أثناء الدمج.'}
+ $('mergeBtn').disabled=!pdfs.length;
+};
+</script>
+</body>
+</html>
